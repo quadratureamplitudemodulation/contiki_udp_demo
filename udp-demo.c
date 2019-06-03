@@ -10,7 +10,7 @@
 #include "sys/etimer.h"
 #include "simple-udp.h"
 #include "net/ip/uip-debug.h"
-#include "dev/cc26xx-uart.h.h"
+#include "dev/cc26xx-uart.h"
 
 #define UDP_PORT_CENTRAL 7878
 #define UDP_PORT_OUT 5555
