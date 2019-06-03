@@ -10,7 +10,7 @@
 #include "sys/etimer.h"
 #include "simple-udp.h"
 #include "net/ip/uip-debug.h"
-#include "dev/uart0.h"
+#include "dev/cc26xx-uart.h.h"
 
 #define UDP_PORT_CENTRAL 7878
 #define UDP_PORT_OUT 5555
@@ -45,7 +45,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
         PROCESS_BEGIN();
         static struct etimer periodic_timer;
         uint8_t buff_udp[50] = "Hello World!";						// Buffer for package which will later be sent
-        uart0_init();
+        cc26xx_uart_init();
 
         // Init IPv6 network
         uip_ip6addr(&server_addr,									// Write human readable IP-Address into struct
@@ -76,7 +76,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
                         		buff_udp, 							// Buffer of bytes to be sent
 								strlen((const char *)buff_udp), 	// Length of buffer
 								&server_addr);						// IP-Address of destination
-                        uart0_writeb('H');
+                        cc26xx_uart_write_byte('H');
                 }
         }
         PROCESS_END();
