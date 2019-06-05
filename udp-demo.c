@@ -10,7 +10,11 @@
 #include "sys/etimer.h"
 #include "simple-udp.h"
 #include "net/ip/uip-debug.h"
+#include "dev/leds.h"
+
+#ifdef CC26XX_UART_H_
 #include "dev/cc26xx-uart.h"
+#endif 
 
 #define UDP_PORT_CENTRAL 7878
 #define UDP_PORT_OUT 5555
@@ -45,7 +49,10 @@ PROCESS_THREAD(init_system_proc, ev, data){
         PROCESS_BEGIN();
         static struct etimer periodic_timer;
         uint8_t buff_udp[50] = "Hello World!";						// Buffer for package which will later be sent
-        cc26xx_uart_init();
+	#ifdef CC26XX_UART_H_
+	cc26xx_uart_init();
+	#endif
+        
 
         // Init IPv6 network
         uip_ip6addr(&server_addr,									// Write human readable IP-Address into struct
@@ -72,11 +79,12 @@ PROCESS_THREAD(init_system_proc, ev, data){
                         printf("Sending data to UDP Server at border router...");
 
                         // Send UDP package to server
-                        simple_udp_sendto(&broadcast_connection,	// Handler to identify connection
+                        /*simple_udp_sendto(&broadcast_connection,	// Handler to identify connection
                         		buff_udp, 							// Buffer of bytes to be sent
 								strlen((const char *)buff_udp), 	// Length of buffer
-								&server_addr);						// IP-Address of destination
-                        cc26xx_uart_write_byte('H');
+								&server_addr);						// IP-Address of destination*/
+                        printf("This is not UART");
+			
                 }
         }
         PROCESS_END();
