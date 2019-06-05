@@ -26,9 +26,7 @@
 static struct simple_udp_connection broadcast_connection;
 static uip_ipaddr_t server_addr;
 static uint16_t central_addr[] = {0xaaaa, 0, 0, 0, 0, 0, 0, 0x1};
-static int sendBuffer = 0;
 static char input_buffer[UART_BUFFER_SIZE];
-
 
 PROCESS(init_system_proc, "Init system process");
 AUTOSTART_PROCESSES(&init_system_proc);
@@ -53,9 +51,7 @@ void cb_receive_udp(struct simple_udp_connection *c,
 int uart_handler(unsigned char c){
 	static int counter = UART_BUFFER_SIZE-1;
 	if(c == UART_END_LINE){
-		sendBuffer=1;
-		printf("Int Handler.\n");
-		process_poll(init_system_proc);
+		process_poll(&init_system_proc);
 		counter=UART_BUFFER_SIZE-1;
 	}
 	else {
@@ -100,16 +96,15 @@ PROCESS_THREAD(init_system_proc, ev, data){
         etimer_set(&periodic_timer, CLOCK_REPORT);
         while (1) {
 
-			PROCESS_WAIT_UNTIL(sendBuffer==1);
+			PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
 			#if DEBUG_CC1310
-			printf("Main Thread.\n");
+			printf(input_buffer);
 			#else
 			simple_udp_sendto(&broadcast_connection,								// Handler to identify connection
 											input_buffer, 							// Buffer of bytes to be sent
 											strlen((const char *)input_buffer), 	// Length of buffer
 											&server_addr);
 			#endif
-			sendBuffer=0;
 
         }
         PROCESS_END();
