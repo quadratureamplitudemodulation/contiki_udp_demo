@@ -50,10 +50,11 @@ void cb_receive_udp(struct simple_udp_connection *c,
 /**********************************************************
  * Int Handler for received UART bytes
  **********************************************************/
-void uart_handler(unsigned char c){
+int uart_handler(unsigned char c){
 	static int counter = UART_BUFFER_SIZE-1;
 	if(c == UART_END_LINE){
 		sendBuffer=1;
+		printf("Int Handler.\n");
 		counter=UART_BUFFER_SIZE-1;
 	}
 	else {
@@ -62,7 +63,7 @@ void uart_handler(unsigned char c){
 		if(counter==0)
 			counter=UART_BUFFER_SIZE-1;
 	}
-
+	return 1;
 }
 
 /**********************************************************
@@ -98,9 +99,9 @@ PROCESS_THREAD(init_system_proc, ev, data){
         etimer_set(&periodic_timer, CLOCK_REPORT);
         while (1) {
 
-			PROCESS_WAIT_UNTIL(sendBuffer);
+			PROCESS_WAIT_UNTIL(sendBuffer==1);
 			#if DEBUG_CC1310
-			printf(input_buffer);
+			printf("Main Thread.\n");
 			#else
 			simple_udp_sendto(&broadcast_connection,								// Handler to identify connection
 											input_buffer, 							// Buffer of bytes to be sent
