@@ -12,7 +12,7 @@
 #include "net/ip/uip-debug.h"
 #include "dev/leds.h"
 
-#ifdef CC26XX_UART_H_
+#ifdef CC26XX_UART_CONF_ENABLE 
 #include "dev/cc26xx-uart.h"
 #endif 
 
@@ -79,10 +79,10 @@ void uart_handler(unsigned char c){
 PROCESS_THREAD(init_system_proc, ev, data){
         PROCESS_BEGIN();
         static struct etimer periodic_timer;
-        uint8_t buff_udp[50] = "Hello World!";						// Buffer for package which will later be sent
 	#ifdef CC26XX_UART_H_
 	cc26xx_uart_init();
 	cc26xx_uart_set_input(uart_handler);
+	printf("CC130: Hello World");
 	#endif
         
 
@@ -108,14 +108,12 @@ PROCESS_THREAD(init_system_proc, ev, data){
                 PROCESS_YIELD();
                 if (etimer_expired(&periodic_timer)) {
                         etimer_reset(&periodic_timer);
-                        printf("Sending data to UDP Server at border router...");
 
                         // Send UDP package to server
                         /*simple_udp_sendto(&broadcast_connection,	// Handler to identify connection
                         		buff_udp, 							// Buffer of bytes to be sent
 								strlen((const char *)buff_udp), 	// Length of buffer
 								&server_addr);						// IP-Address of destination*/
-                        printf("This is not UART");
 			
                 }
         }
