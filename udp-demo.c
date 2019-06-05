@@ -29,7 +29,7 @@ PROCESS(init_system_proc, "Init system process");
 AUTOSTART_PROCESSES(&init_system_proc);
 
 /**********************************************************
- * Int Handler for received packages
+ * Int Handler for received UDP packages
  **********************************************************/
 void cb_receive_udp(struct simple_udp_connection *c,
                     const uip_ipaddr_t *sender_addr,
@@ -43,6 +43,13 @@ void cb_receive_udp(struct simple_udp_connection *c,
 }
 
 /**********************************************************
+ * Int Handler for received UART bytes
+ **********************************************************/
+void uart_handler(unsigned char c){
+
+}
+
+/**********************************************************
  * Main process
  **********************************************************/
 PROCESS_THREAD(init_system_proc, ev, data){
@@ -51,6 +58,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
         uint8_t buff_udp[50] = "Hello World!";						// Buffer for package which will later be sent
 	#ifdef CC26XX_UART_H_
 	cc26xx_uart_init();
+	cc26xx_uart_set_input(uart_handler);
 	#endif
         
 
