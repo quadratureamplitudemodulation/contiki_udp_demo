@@ -16,14 +16,17 @@
 #include "dev/cc26xx-uart.h"
 #endif 
 
+#define DEBUG_CC1310 1
+
 #define UDP_PORT_CENTRAL 7878
 #define UDP_PORT_OUT 5555
+#define UART_BUFFER_SIZE 100
+#define UART_END_LINE ';'
 #define CLOCK_REPORT CLOCK_SECOND*2
 static struct simple_udp_connection broadcast_connection;
 static uip_ipaddr_t server_addr;
 static uint16_t central_addr[] = {0xaaaa, 0, 0, 0, 0, 0, 0, 0x1};
 
-void connect_udp_server();
 
 PROCESS(init_system_proc, "Init system process");
 AUTOSTART_PROCESSES(&init_system_proc);
@@ -46,6 +49,27 @@ void cb_receive_udp(struct simple_udp_connection *c,
  * Int Handler for received UART bytes
  **********************************************************/
 void uart_handler(unsigned char c){
+	static char input_buffer[UART_BUFFER_SIZE];
+	static int counter = 0;
+	if(c == UART_END_LINE){
+		#if DEBUG_CC1310
+		printf(input_buffer);
+		#else
+		simple_udp_sendto(&broadcast_connection,								// Handler to identify connection
+		                        		input_buffer, 							// Buffer of bytes to be sent
+										strlen((const char *)input_buffer), 	// Length of buffer
+										&server_addr);
+		#endif
+		counter=0;
+	}
+	else {
+		input_buffer[counter]=c;
+		counter++;
+		if(counter==UART_BUFFER_SIZE){
+			printf("Buffer overflow. Reset packet");
+			counter=0;
+		}
+	}
 
 }
 
