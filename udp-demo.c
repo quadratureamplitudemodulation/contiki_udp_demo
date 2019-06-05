@@ -26,6 +26,8 @@
 static struct simple_udp_connection broadcast_connection;
 static uip_ipaddr_t server_addr;
 static uint16_t central_addr[] = {0xaaaa, 0, 0, 0, 0, 0, 0, 0x1};
+static int sendBuffer = 0;
+static char input_buffer[UART_BUFFER_SIZE];
 
 
 PROCESS(init_system_proc, "Init system process");
@@ -49,26 +51,16 @@ void cb_receive_udp(struct simple_udp_connection *c,
  * Int Handler for received UART bytes
  **********************************************************/
 void uart_handler(unsigned char c){
-	static char input_buffer[UART_BUFFER_SIZE];
-	static int counter = 0;
+	static int counter = UART_BUFFER_SIZE-1;
 	if(c == UART_END_LINE){
-		#if DEBUG_CC1310
-		printf(input_buffer);
-		#else
-		simple_udp_sendto(&broadcast_connection,								// Handler to identify connection
-		                        		input_buffer, 							// Buffer of bytes to be sent
-										strlen((const char *)input_buffer), 	// Length of buffer
-										&server_addr);
-		#endif
-		counter=0;
+		sendBuffer=1;
+		counter=UART_BUFFER_SIZE-1;
 	}
 	else {
 		input_buffer[counter]=c;
-		counter++;
-		if(counter==UART_BUFFER_SIZE){
-			printf("Buffer overflow. Reset packet");
-			counter=0;
-		}
+		counter--;
+		if(counter==0)
+			counter=UART_BUFFER_SIZE-1;
 	}
 
 }
@@ -105,17 +97,18 @@ PROCESS_THREAD(init_system_proc, ev, data){
                             cb_receive_udp);						// Int handler for incoming packages
         etimer_set(&periodic_timer, CLOCK_REPORT);
         while (1) {
-                PROCESS_YIELD();
-                if (etimer_expired(&periodic_timer)) {
-                        etimer_reset(&periodic_timer);
 
-                        // Send UDP package to server
-                        /*simple_udp_sendto(&broadcast_connection,	// Handler to identify connection
-                        		buff_udp, 							// Buffer of bytes to be sent
-								strlen((const char *)buff_udp), 	// Length of buffer
-								&server_addr);						// IP-Address of destination*/
-			
-                }
+			PROCESS_WAIT_UNTIL(sendBuffer);
+			#if DEBUG_CC1310
+			printf(input_buffer);
+			#else
+			simple_udp_sendto(&broadcast_connection,								// Handler to identify connection
+											input_buffer, 							// Buffer of bytes to be sent
+											strlen((const char *)input_buffer), 	// Length of buffer
+											&server_addr);
+			#endif
+			sendBuffer=0;
+
         }
         PROCESS_END();
 }
