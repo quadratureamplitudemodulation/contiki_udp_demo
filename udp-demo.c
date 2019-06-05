@@ -55,6 +55,7 @@ int uart_handler(unsigned char c){
 	if(c == UART_END_LINE){
 		sendBuffer=1;
 		printf("Int Handler.\n");
+		process_poll(init_system_proc);
 		counter=UART_BUFFER_SIZE-1;
 	}
 	else {
