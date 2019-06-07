@@ -3,6 +3,7 @@
 
 # Allow only custom-edited files
 !udp-demo.c
+!udp-server.c
 !project-config.h
 !Makefile
 !Makefile.target
