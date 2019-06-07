@@ -11,6 +11,8 @@
 #include "simple-udp.h"
 #include "net/ip/uip-debug.h"
 #include "dev/leds.h"
+#include "servreg-hack.h"
+#include "dev/button-sensor.h"
 
 #ifdef CC26XX_UART_CONF_ENABLE 
 #include "dev/cc26xx-uart.h"
@@ -24,8 +26,8 @@
 #define UART_END_LINE ';'
 #define CLOCK_REPORT CLOCK_SECOND*2
 static struct simple_udp_connection broadcast_connection;
-static uip_ipaddr_t server_addr;
-static uint16_t central_addr[] = {0xaaaa, 0, 0, 0, 0, 0, 0, 0x1};
+//static uip_ipaddr_t server_addr;
+//static uint16_t central_addr[] = {0xaaaa, 0, 0, 0, 0, 0, 0, 0x1};
 static char input_buffer[UART_BUFFER_SIZE];
 
 PROCESS(init_system_proc, "Init system process");
@@ -69,14 +71,18 @@ int uart_handler(unsigned char c){
 PROCESS_THREAD(init_system_proc, ev, data){
         PROCESS_BEGIN();
         static struct etimer periodic_timer;
-	#ifdef CC26XX_UART_H_
-	cc26xx_uart_init();
-	cc26xx_uart_set_input(uart_handler);
-	printf("CC130: Hello World");
-	#endif
+        uip_ipaddr_t *ip_dest_p;
+        static servreg_hack_id_t serviceID = 200;
+        SENSORS_ACTIVATE(button_sensor);
+		#ifdef CC26XX_UART_H_
+		cc26xx_uart_init();
+		cc26xx_uart_set_input(uart_handler);
+		printf("CC130: Hello World");
+		#endif
+		servreg_hack_init();
         
 
-        // Init IPv6 network
+        /*// Init IPv6 network
         uip_ip6addr(&server_addr,									// Write human readable IP-Address into struct
                     central_addr[0],
                     central_addr[1],
@@ -86,24 +92,29 @@ PROCESS_THREAD(init_system_proc, ev, data){
                     central_addr[5],
                     central_addr[6],
                     central_addr[7]);
-
+*/
         // Register with Simple-UDP
         simple_udp_register(&broadcast_connection,					// Handler to identify this connection
                             UDP_PORT_OUT,							// Port for outgoing packages
-                            &server_addr,							// Destination-IP-Address for outgoing packages
+                            NULL,									// Destination-IP-Address for outgoing packages
                             UDP_PORT_CENTRAL,						// Port for incoming packages
                             cb_receive_udp);						// Int handler for incoming packages
         etimer_set(&periodic_timer, CLOCK_REPORT);
         while (1) {
 
-			PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
+			//PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
+			PROCESS_YIELD_UNTI(ev==sensors_event && data==&button_sensor);
 			#if DEBUG_CC1310
 			printf(input_buffer);
 			#else
-			simple_udp_sendto(&broadcast_connection,								// Handler to identify connection
-											input_buffer, 							// Buffer of bytes to be sent
-											strlen((const char *)input_buffer), 	// Length of buffer
-											&server_addr);
+			ip_dest_p = servreg_hack_lookup(serviceID);
+			if(ip_dest_p==NULL)
+				printf("Server not found");
+			else
+				simple_udp_sendto(&broadcast_connection,				// Handler to identify connection
+								input_buffer, 							// Buffer of bytes to be sent
+								strlen((const char *)input_buffer), 	// Length of buffer
+								ip_dest_p);
 			#endif
 
         }
