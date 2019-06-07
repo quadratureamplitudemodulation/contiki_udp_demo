@@ -21,6 +21,9 @@
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
 
+/* ID for Servrag-Hack. Must be the same as on receiver side */
+#define SERVICE_ID 190
+
 #define UART_BUFFER_SIZE 100
 #define UART_END_LINE ';'
 
@@ -88,7 +91,12 @@ PROCESS_THREAD(init_system_proc, ev, data){
                             NULL,									// Destination-IP-Address for outgoing packages
                             UDP_PORT_CENTRAL,						// Port for incoming packages
                             cb_receive_udp);						// Int handler for incoming packages
+#ifdef DEBUG_COOJA
         printf("Initialized\n");
+#elif DEBUG_CC1310
+        printf("Initialized\n");
+#endif
+
         while (1) {
 			#ifdef DEBUG_COOJA
         	PROCESS_YIELD_UNTIL(ev==sensors_event);
