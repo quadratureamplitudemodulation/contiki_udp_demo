@@ -76,6 +76,8 @@ PROCESS_THREAD(init_system_proc, ev, data){
         /* ID for Servrag-Hack. Must be the same as on receiver side */
         static servreg_hack_id_t serviceID = 190;
 
+        rpl_set_mode(RPL_MODE_LEAF);
+
         SENSORS_ACTIVATE(button_sensor);
 
         #ifdef CC26XX_UART_H_
