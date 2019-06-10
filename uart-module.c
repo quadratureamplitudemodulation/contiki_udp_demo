@@ -49,7 +49,7 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 			if(COMPARE(ptr, "register")){
 				ptr=TOKENIZE_RESUME;
 				if(convertid(ptr, &id)){
-					printf("Succesfull. ID: %i \n",id);
+					process_post(&init_system_proc, CUSTOMER_EVENT_REGISTER_ID, &id);
 				}
 				else{
 					if(id)

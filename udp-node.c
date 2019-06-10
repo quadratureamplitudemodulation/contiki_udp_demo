@@ -112,7 +112,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
     								strlen((const char *)packet->data), // Length of buffer
     								ip_dest_p);							// Destination IP-Address*/
         	}
-        	else if(ev==CUSTOMER_REGISTER_ID){
+        	else if(ev==CUSTOMER_EVENT_REGISTER_ID){
         		printf("Register service with id %i\n", *(servreg_hack_id_t *)data);
         		servreg_hack_register(*(servreg_hack_id_t *)data, ip_addr);
         	}
