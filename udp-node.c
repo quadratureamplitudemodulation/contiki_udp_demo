@@ -98,6 +98,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
         	if(ev==CUSTOMER_EVENT_SEND_TO_ID){
         		udp_packet *packet;
         		packet = (udp_packet *)data;
+			printf("Trying to reach ID: %i\n", packet->dest_id);
     			ip_dest_p = servreg_hack_lookup(packet->dest_id);				// Get receiver IP via Servreg-Hack
     			if(ip_dest_p==NULL)
     				printf("Server not found \n");
