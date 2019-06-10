@@ -69,7 +69,7 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 					if(convertid(ptr, &id)){
 						ptr=TOKENIZE_RESUME;
 						printf("Sending to ID %i the data %s\n", id, ptr);
-					}
+						process_post(init_system_proc, sensors_event, ptr);					}
 					else{
 						if(id)
 							printf("Please type a valid number for ID.\n");

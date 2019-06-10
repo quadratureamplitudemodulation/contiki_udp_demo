@@ -109,6 +109,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
         while (1) {
 #ifdef DEBUG_Z1
         	PROCESS_YIELD_UNTIL(ev==sensors_event);
+        	printf("Process continued with data %s\n", data);
 #else
         	PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
 
@@ -117,7 +118,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
 #ifdef DEBUG_CC1310
 			printf(input_buffer);
 #else
-			ip_dest_p = servreg_hack_lookup(serviceID);				// Get receiver IP via Servreg-Hack
+			/*ip_dest_p = servreg_hack_lookup(serviceID);				// Get receiver IP via Servreg-Hack
 			if(ip_dest_p==NULL)
 				printf("\n Server not found \n");
 			else
