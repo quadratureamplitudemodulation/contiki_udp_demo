@@ -27,5 +27,7 @@
 #undef RPL_CONF_OF
 #define RPL_CONF_OF                    rpl_of0
 
+#define UART0_CONF_WITH_INPUT 1
+
 #endif 
 

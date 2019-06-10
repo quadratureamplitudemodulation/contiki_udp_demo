@@ -16,13 +16,16 @@
  */
 
 //#define DEBUG_CC1310	// CC1310 will not send UDP packets, but UART messages
-#define DEBUG_COOJA	// Node will not react to UART messages, but send "Hello World" via UDP when Button is pressed
+#define DEBUG_Z1	// Node will not react to UART messages, but send "Hello World" via UDP when Button is pressed
 
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
 
 /* ID for Servrag-Hack. Must be the same as on sender side */
-#define SERVICE_ID 190
+#define SERVICE_ID_ROOT 190
+
+/* Handler for Simple-UDP Connection */
+static struct simple_udp_connection udp_connection;
 
 PROCESS(init_system_proc, "Init system process");
 AUTOSTART_PROCESSES(&init_system_proc);
@@ -39,6 +42,18 @@ void cb_receive_udp(struct simple_udp_connection *c,
                     uint16_t datalen) {
 #ifdef DEBUG_COOJA
 		printf("Received data via UDP: %s \n", data);
+		printf("From Port: %i \n", sender_port);
+		if(sender_addr == NULL)
+			printf("No sender address");
+		else{
+			printf("From address: ");
+			uip_debug_ipaddr_print(sender_addr);
+		}
+		simple_udp_sendto_port(c,								// Handler to identify connection
+						data, 									// Buffer of bytes to be sent
+						datalen,								// Length of buffer
+						sender_addr,							// Destination IP-Address
+						sender_port);
 #elif DEBUG_CC1310
 		printf("Received data via UDP: %s \n", data);
 #else
@@ -88,14 +103,11 @@ create_rpl_dag(uip_ipaddr_t *ipaddr)
 PROCESS_THREAD(init_system_proc, ev, data){
         PROCESS_BEGIN();
 
-        /* Handler for Simple-UDP Connection */
-        static struct simple_udp_connection udp_connection;
-
         /* IP Address of device */
         static uip_ipaddr_t *ip_addr;
 
         /* ID for Servrag-Hack. Must be the same as on sender side */
-        static servreg_hack_id_t serviceID = SERVICE_ID;
+        static servreg_hack_id_t serviceID = SERVICE_ID_ROOT;
 
 #ifdef CC26XX_UART_H_
 		cc26xx_uart_init();

@@ -4,25 +4,26 @@
 #include "simple-udp.h"
 #include "net/ip/uip-debug.h"
 #include "dev/button-sensor.h"
-
-
-#ifdef CC26XX_UART_CONF_ENABLE 
-#include "dev/cc26xx-uart.h"
-#include "dev/serial-line.h"
-#endif 
+#include "net/rpl/rpl.h"
+#include "uart-module.h"
 
 /* Normally the software runs to be used on a CC1310. However if it's supposed to be debugged, on of the following
  * defines can be used.
  */
 
 //#define DEBUG_CC1310	// CC1310 will not send UDP packets, but UART messages
-#define DEBUG_COOJA	// Node will not react to UART messages, but send "Hello World" via UDP when Button is pressed
-
+#define DEBUG_Z1	// Node will not react to UART messages, but send "Hello World" via UDP when Button is pressed
+#ifdef DEBUG_Z1
+#include "dev/leds.h"
+#endif
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
 
 /* ID for Servrag-Hack. Must be the same as on receiver side */
-#define SERVICE_ID 190
+#define SERVICE_ID_ROOT 190
+
+/* ID for own Servrag-Hack Service. Must be the same as on sender side */
+#define SERVICE_ID_SVR 200
 
 #define UART_BUFFER_SIZE 100
 #define UART_END_LINE ';'
@@ -42,24 +43,27 @@ void cb_receive_udp(struct simple_udp_connection *c,
                     uint16_t receiver_port,
                     const uint8_t *data,
                     uint16_t datalen) {
+#ifdef DEBUG_Z1
+	leds_toggle(LEDS_ALL);
+	printf("Received data");
+#elif DEBUG_CC1310
+	printf("Received data");
  }
-
+#endif
+}
 /**********************************************************
- * Int Handler for received UART bytes
+ * Set global IPv6 Address
  **********************************************************/
-int uart_handler(unsigned char c){
-	static int counter = UART_BUFFER_SIZE-1;
-	if(c == UART_END_LINE){
-		process_poll(&init_system_proc);
-		counter=UART_BUFFER_SIZE-1;
-	}
-	else {
-		input_buffer[counter]=c;
-		counter--;
-		if(counter==0)
-			counter=UART_BUFFER_SIZE-1;
-	}
-	return 1;
+static uip_ipaddr_t *
+set_global_address(void)
+{
+  static uip_ipaddr_t ipaddr;
+
+  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
+  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+
+  return &ipaddr;
 }
 /**********************************************************
  * Main process
@@ -70,45 +74,49 @@ PROCESS_THREAD(init_system_proc, ev, data){
         /* Handler for Simple-UDP Connection */
         static struct simple_udp_connection udp_connection;
 
+        /* IP Address of device */
+		static uip_ipaddr_t *ip_addr;
+
+		ip_addr = set_global_address();
+
+		uart_init();
+		process_start(&uart_int_handler, NULL);
+
         /* IP Address of destination */
         uip_ipaddr_t *ip_dest_p;
 
         /* ID for Servrag-Hack. Must be the same as on receiver side */
-        static servreg_hack_id_t serviceID = 190;
+        static servreg_hack_id_t serviceID = SERVICE_ID_ROOT;
 
         rpl_set_mode(RPL_MODE_LEAF);
 
         SENSORS_ACTIVATE(button_sensor);
 
-        #ifdef CC26XX_UART_H_
-		cc26xx_uart_init();
-		cc26xx_uart_set_input(uart_handler);
-		printf("CC130: Hello World");
-		#endif
-
 		servreg_hack_init();
+		servreg_hack_register(SERVICE_ID_SVR, ip_addr);
 
         simple_udp_register(&udp_connection,						// Handler to identify this connection
                             UDP_PORT_OUT,							// Port for outgoing packages
                             NULL,									// Destination-IP-Address for outgoing packages
                             UDP_PORT_CENTRAL,						// Port for incoming packages
                             cb_receive_udp);						// Int handler for incoming packages
-#ifdef DEBUG_COOJA
+#ifdef DEBUG_Z1
         printf("Initialized\n");
 #elif DEBUG_CC1310
         printf("Initialized\n");
 #endif
 
         while (1) {
-			#ifdef DEBUG_COOJA
+#ifdef DEBUG_Z1
         	PROCESS_YIELD_UNTIL(ev==sensors_event);
-			#else
+#else
         	PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
-			#endif
 
-        	#ifdef DEBUG_CC1310
+#endif
+
+#ifdef DEBUG_CC1310
 			printf(input_buffer);
-			#else
+#else
 			ip_dest_p = servreg_hack_lookup(serviceID);				// Get receiver IP via Servreg-Hack
 			if(ip_dest_p==NULL)
 				printf("\n Server not found \n");
@@ -118,8 +126,8 @@ PROCESS_THREAD(init_system_proc, ev, data){
 				simple_udp_sendto(&udp_connection,					// Handler to identify connection
 								input_buffer, 						// Buffer of bytes to be sent
 								strlen((const char *)input_buffer), // Length of buffer
-								ip_dest_p);							// Destination IP-Address
-			#endif
+								ip_dest_p);							// Destination IP-Address*/
+#endif
 
         }
         PROCESS_END();
