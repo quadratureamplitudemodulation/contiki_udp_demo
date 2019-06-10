@@ -6,6 +6,7 @@
 #include "dev/button-sensor.h"
 #include "net/rpl/rpl.h"
 #include "uart-module.h"
+#include "init_process.h"
 
 /* Normally the software runs to be used on a CC1310. However if it's supposed to be debugged, on of the following
  * defines can be used.
@@ -108,7 +109,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
 
         while (1) {
 #ifdef DEBUG_Z1
-        	PROCESS_YIELD_UNTIL(ev==sensors_event);
+        	PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
         	printf("Process continued with data %s\n", data);
 #else
         	PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);

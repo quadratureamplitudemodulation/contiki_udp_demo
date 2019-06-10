@@ -4,6 +4,7 @@
 #include "contiki-net.h"
 #include "dev/serial-line.h"
 #include "uart-module.h"
+#include "init_process.h"
 
 #ifdef CC26XX_UART_CONF_ENABLE
 #include "dev/cc26xx-uart.h"
@@ -69,7 +70,8 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 					if(convertid(ptr, &id)){
 						ptr=TOKENIZE_RESUME;
 						printf("Sending to ID %i the data %s\n", id, ptr);
-						process_post(init_system_proc, sensors_event, ptr);					}
+						process_post(&init_system_proc, PROCESS_EVENT_POLL, ptr);
+					}
 					else{
 						if(id)
 							printf("Please type a valid number for ID.\n");

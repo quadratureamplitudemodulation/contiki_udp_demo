@@ -1,5 +1,4 @@
 CONTIKI_PROJECT = udp-node
-CONTIKI_PROJECT = udp-root
 all: $(CONTIKI_PROJECT)
 APPS=servreg-hack
 PROJECT_SOURCEFILES += uart-module.c
