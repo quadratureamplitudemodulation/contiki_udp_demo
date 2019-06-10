@@ -2,10 +2,12 @@
 *
 
 # Allow only custom-edited files
-!udp-demo.c
-!udp-server.c
-!project-config.h
+!*.c
+!*.h
 !Makefile
 !Makefile.target
 !.gitignore
 !README.md
+
+*symbols.c
+*symbols.h
