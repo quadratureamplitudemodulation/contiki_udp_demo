@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include "contiki.h"
 #include "contiki-net.h"
 #include "dev/serial-line.h"
@@ -18,6 +17,23 @@
 
 PROCESS(uart_int_handler, "UART Interrupt Handler");
 
+static short int convertid(char *string, unsigned short int *target){
+	unsigned int i;
+	for(i=0; i<3; i++)
+		if(string[i]<'0' || string[i]>'9'){
+			*target=255;
+			return 0;
+		}
+	i = ((unsigned int)string[0]-'0')*100+((unsigned int)string[1]-'0')*10+((unsigned int)string[2]-'0');
+	if(i>127 && i<256)
+		*target=(unsigned short int) i;
+	else{
+		*target=0;
+		return 0;
+	}
+	return 1;
+}
+
 PROCESS_THREAD(uart_int_handler, ev, data){
 	PROCESS_BEGIN();
 	while(1){
@@ -31,16 +47,42 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 			ptr=TOKENIZE_RESUME;
 			if(COMPARE(ptr, "register")){
 				ptr=TOKENIZE_RESUME;
-				unsigned long int buffer = strtoul(ptr, NULL, 0);
-				if(buffer>127 && buffer<256){
-					id=(unsigned short int)buffer;
-					printf("ID: %i\n", id);
+				if(convertid(ptr, &id)){
+					printf("Succesfull. ID: %i \n",id);
 				}
 				else{
-					printf("ID is out of range. Must be from 128 to 255.\n");
+					if(id)
+						printf("Please type a valid number for ID.\n");
+					else
+						printf("ID is out of range. Must be from 128 to 255.\n");
 				}
 			}
-			printf("Command not recognised. Did you mean one of the following?\nservice register [ID] : ID must be from 128 to 255\n");
+			else
+				printf("Command not recognised. Did you mean one of the following?\n'service register [ID]' : ID must be from 128 to 255\n");
+		}
+		else if(COMPARE(ptr, "udp")){
+			ptr=TOKENIZE_RESUME;
+			if(COMPARE(ptr, "send")){
+				ptr=TOKENIZE_RESUME;
+				if(COMPARE(ptr, "id")){
+					ptr=TOKENIZE_RESUME;
+					if(convertid(ptr, &id)){
+						ptr=TOKENIZE_RESUME;
+						printf("Sending to ID %i the data %s\n", id, ptr);
+					}
+					else{
+						if(id)
+							printf("Please type a valid number for ID.\n");
+						else
+							printf("ID is out of range. Must be from 128 to 255.\n");
+					}
+				}
+				else
+					printf("Command not recognised. Did you mean one of the following?\n'udp send id [ID] [data]: Send data to ID. ID must be from 128 to 255'\n");
+			}
+			else
+				printf("Command not recognised. Did you mean one of the following?\n'udp send id [ID] [data]: Send data to ID. ID must be from 128 to 255'\n");
+
 		}
 
 		else{
@@ -61,3 +103,4 @@ void uart_init(void){
 	uart0_set_input(serial_line_input_byte);
 #endif
 }
+
