@@ -20,17 +20,6 @@
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
 
-/* ID for Servrag-Hack. Must be the same as on receiver side */
-#define SERVICE_ID_ROOT 190
-
-/* ID for own Servrag-Hack Service. Must be the same as on sender side */
-#define SERVICE_ID_SVR 200
-
-#define UART_BUFFER_SIZE 100
-#define UART_END_LINE ';'
-
-static char input_buffer[UART_BUFFER_SIZE] ={"Hello World"};	// Message that was received via UART and gets send via UDP
-
 PROCESS(init_system_proc, "Init system process");
 AUTOSTART_PROCESSES(&init_system_proc);
 
@@ -86,15 +75,11 @@ PROCESS_THREAD(init_system_proc, ev, data){
         /* IP Address of destination */
         uip_ipaddr_t *ip_dest_p;
 
-        /* ID for Servrag-Hack. Must be the same as on receiver side */
-        static servreg_hack_id_t serviceID = SERVICE_ID_ROOT;
-
         rpl_set_mode(RPL_MODE_LEAF);
 
         SENSORS_ACTIVATE(button_sensor);
 
 		servreg_hack_init();
-		servreg_hack_register(SERVICE_ID_SVR, ip_addr);
 
         simple_udp_register(&udp_connection,						// Handler to identify this connection
                             UDP_PORT_OUT,							// Port for outgoing packages
@@ -109,8 +94,27 @@ PROCESS_THREAD(init_system_proc, ev, data){
 
         while (1) {
 #ifdef DEBUG_Z1
-        	PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
-        	printf("Process continued with data %s\n", data);
+        	PROCESS_YIELD();
+        	if(ev==CUSTOMER_EVENT_SEND_TO_ID){
+        		udp_packet *packet;
+        		packet = (udp_packet *)data;
+    			ip_dest_p = servreg_hack_lookup(packet->dest_id);				// Get receiver IP via Servreg-Hack
+    			if(ip_dest_p==NULL)
+    				printf("Server not found \n");
+    			else
+    				printf("Server address ");
+    				uip_debug_ipaddr_print(ip_dest_p);
+    				printf("\n");
+    				printf("Data: %s\n", packet->data);
+    				simple_udp_sendto(&udp_connection,					// Handler to identify connection
+    								packet->data, 						// Buffer of bytes to be sent
+    								strlen((const char *)packet->data), // Length of buffer
+    								ip_dest_p);							// Destination IP-Address*/
+        	}
+        	else if(ev==CUSTOMER_REGISTER_ID){
+        		printf("Register service with id %i\n", *(servreg_hack_id_t *)data);
+        		servreg_hack_register(*(servreg_hack_id_t *)data, ip_addr);
+        	}
 #else
         	PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
 
@@ -119,16 +123,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
 #ifdef DEBUG_CC1310
 			printf(input_buffer);
 #else
-			/*ip_dest_p = servreg_hack_lookup(serviceID);				// Get receiver IP via Servreg-Hack
-			if(ip_dest_p==NULL)
-				printf("\n Server not found \n");
-			else
-				printf("\n Server address ");
-				uip_debug_ipaddr_print(ip_dest_p);
-				simple_udp_sendto(&udp_connection,					// Handler to identify connection
-								input_buffer, 						// Buffer of bytes to be sent
-								strlen((const char *)input_buffer), // Length of buffer
-								ip_dest_p);							// Destination IP-Address*/
+
 #endif
 
         }

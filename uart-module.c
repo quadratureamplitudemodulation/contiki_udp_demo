@@ -70,7 +70,10 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 					if(convertid(ptr, &id)){
 						ptr=TOKENIZE_RESUME;
 						printf("Sending to ID %i the data %s\n", id, ptr);
-						process_post(&init_system_proc, PROCESS_EVENT_POLL, ptr);
+						udp_packet packet;
+						packet.dest_id=id;
+						packet.data=ptr;
+						process_post(&init_system_proc, CUSTOMER_EVENT_SEND_TO_ID, &packet);
 					}
 					else{
 						if(id)
