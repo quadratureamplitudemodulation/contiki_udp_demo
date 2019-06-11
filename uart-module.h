@@ -1,5 +1,5 @@
-#ifndef UART-MODULE
-#define UART-MODULE
+#ifndef UARTMODULE
+#define UARTMODULE UARTMODULE
 PROCESS_NAME(uart_int_handler);
 
 void uart_init(void);

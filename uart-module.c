@@ -14,7 +14,8 @@
 
 #define COMPARE(string1, string2) (!strcmp(string1, string2))
 #define TOKENIZE_START(string) strtok(string, " ")
-#define TOKENIZE_RESUME strtok(NULL, " ");
+#define TOKENIZE_RESUME strtok(NULL, " ")
+#define TOKENIZE_REST strtok(NULL, "\0")
 
 PROCESS(uart_int_handler, "UART Interrupt Handler");
 
@@ -22,6 +23,7 @@ static short int convertid(char *string, unsigned short int *target){
 	unsigned int i;
 	for(i=0; i<3; i++)
 		if(string[i]<'0' || string[i]>'9'){
+			printf("Please type a valid number for ID.\n");
 			*target=255;
 			return 0;
 		}
@@ -29,6 +31,7 @@ static short int convertid(char *string, unsigned short int *target){
 	if(i>127 && i<256)
 		*target=(unsigned short int) i;
 	else{
+		printf("ID is out of range. Must be from 128 to 255.\n");
 		*target=0;
 		return 0;
 	}
@@ -52,15 +55,20 @@ static udp_packet packet;
 				if(convertid(ptr, &id)){
 					process_post(&init_system_proc, CUSTOMER_EVENT_REGISTER_ID, &id);
 				}
-				else{
-					if(id)
-						printf("Please type a valid number for ID.\n");
-					else
-						printf("ID is out of range. Must be from 128 to 255.\n");
+			}
+			else if(COMPARE(ptr, "get")){
+				ptr=TOKENIZE_RESUME;
+				if(COMPARE(ptr, "ip")){
+					ptr=TOKENIZE_RESUME;
+					if(convertid(ptr, &id)){
+						process_post(&init_system_proc, CUSTOMER_EVENT_GET_IP_FROM_ID, &id);
+					}
 				}
+				else
+					printf("Command not recognised. Did you mean one of the following?\n'service get ip [ID]'\nNote: [ID] must be from 128 to 255\n");
 			}
 			else
-				printf("Command not recognised. Did you mean one of the following?\n'service register [ID]' : ID must be from 128 to 255\n");
+				printf("Command not recognised. Did you mean one of the following?\n'service register [ID]'\n'service get ip [ID]'\nNote: [ID] must be from 128 to 255\n");
 		}
 		else if(COMPARE(ptr, "udp")){
 			ptr=TOKENIZE_RESUME;
@@ -69,17 +77,11 @@ static udp_packet packet;
 				if(COMPARE(ptr, "id")){
 					ptr=TOKENIZE_RESUME;
 					if(convertid(ptr, &id)){
-						ptr=TOKENIZE_RESUME;
+						ptr=TOKENIZE_REST;
 						printf("Sending to ID %i the data %s\n", id, ptr);
 						packet.dest_id=id;
 						packet.data=ptr;
 						process_post(&init_system_proc, CUSTOMER_EVENT_SEND_TO_ID, &packet);
-					}
-					else{
-						if(id)
-							printf("Please type a valid number for ID.\n");
-						else
-							printf("ID is out of range. Must be from 128 to 255.\n");
 					}
 				}
 				else
@@ -87,6 +89,16 @@ static udp_packet packet;
 			}
 			else
 				printf("Command not recognised. Did you mean one of the following?\n'udp send id [ID] [data]: Send data to ID. ID must be from 128 to 255'\n");
+
+		}
+		else if(COMPARE(ptr, "print")){
+			ptr = TOKENIZE_RESUME;
+			if(COMPARE(ptr, "id")){
+				process_post(&init_system_proc, CUSTOMER_EVENT_GET_LOCAL_ID, NULL);
+			}
+			if(COMPARE(ptr, "ip")){
+				process_post(&init_system_proc, CUSTOMER_EVENT_GET_LOCAL_IP, NULL);
+			}
 
 		}
 
@@ -100,7 +112,7 @@ static udp_packet packet;
 
 void uart_init(void){
 	serial_line_init();
-#ifdef CC26XX_UART_H_
+#ifdef RELEASE
 	cc26xx_uart_init();
 	cc26xx_uart_set_input(serial_line_input_byte);
 #else

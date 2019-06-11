@@ -12,11 +12,9 @@
  * defines can be used.
  */
 
-//#define DEBUG_CC1310	// CC1310 will not send UDP packets, but UART messages
-#define DEBUG_Z1	// Node will not react to UART messages, but send "Hello World" via UDP when Button is pressed
-#ifdef DEBUG_Z1
-#include "dev/leds.h"
-#endif
+#define DEBUG
+//#define RELEASE
+
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
 
@@ -33,13 +31,9 @@ void cb_receive_udp(struct simple_udp_connection *c,
                     uint16_t receiver_port,
                     const uint8_t *data,
                     uint16_t datalen) {
-#ifdef DEBUG_Z1
-	leds_toggle(LEDS_ALL);
-	printf("Received data");
-#elif DEBUG_CC1310
-	printf("Received data");
- }
-#endif
+	printf("Received data %s from IP \n", data);
+	uip_debug_ipaddr_print(sender_addr);
+	printf("\non port %i\n", receiver_port);
 }
 /**********************************************************
  * Set global IPv6 Address
@@ -67,6 +61,9 @@ PROCESS_THREAD(init_system_proc, ev, data){
         /* IP Address of device */
 		static uip_ipaddr_t *ip_addr;
 
+		/* ID for servreg-hack */
+		static servreg_hack_id_t serviceID = 0;
+
 		ip_addr = set_global_address();
 
 		uart_init();
@@ -77,8 +74,6 @@ PROCESS_THREAD(init_system_proc, ev, data){
 
         rpl_set_mode(RPL_MODE_LEAF);
 
-        SENSORS_ACTIVATE(button_sensor);
-
 		servreg_hack_init();
 
         simple_udp_register(&udp_connection,						// Handler to identify this connection
@@ -86,19 +81,13 @@ PROCESS_THREAD(init_system_proc, ev, data){
                             NULL,									// Destination-IP-Address for outgoing packages
                             UDP_PORT_CENTRAL,						// Port for incoming packages
                             cb_receive_udp);						// Int handler for incoming packages
-#ifdef DEBUG_Z1
-        printf("Initialized\n");
-#elif DEBUG_CC1310
-        printf("Initialized\n");
-#endif
 
         while (1) {
-#ifdef DEBUG_Z1
         	PROCESS_YIELD();
         	if(ev==CUSTOMER_EVENT_SEND_TO_ID){
         		udp_packet packet;
         		packet = *(udp_packet *)data;
-			printf("Trying to reach ID: %i\n", packet.dest_id);
+        		printf("Trying to reach ID: %i\n", packet.dest_id);
     			ip_dest_p = servreg_hack_lookup(packet.dest_id);				// Get receiver IP via Servreg-Hack
     			if(ip_dest_p==NULL)
     				printf("Server not found \n");
@@ -108,25 +97,42 @@ PROCESS_THREAD(init_system_proc, ev, data){
     				printf("\n");
     				printf("Data: %s\n", packet.data);
     				simple_udp_sendto(&udp_connection,					// Handler to identify connection
-    								packet.data, 						// Buffer of bytes to be sent
-    								strlen((const char *)packet.data), // Length of buffer
+    								packet.data, 						// Data to be sent
+    								strlen(packet.data), 				// Length of data
     								ip_dest_p);							// Destination IP-Address*/
         	}
         	else if(ev==CUSTOMER_EVENT_REGISTER_ID){
-        		printf("Register service with id %i\n", *(servreg_hack_id_t *)data);
-        		servreg_hack_register(*(servreg_hack_id_t *)data, ip_addr);
+        		if(servreg_hack_lookup(*(servreg_hack_id_t *)data)==NULL){
+					printf("Register service with id %i\n", *(uint *)data);
+					servreg_hack_register(*(servreg_hack_id_t *)data, ip_addr);
+					serviceID = *(servreg_hack_id_t *)data;
+        		}
+        		else
+        			printf("ID %i already in use. Try another one.\n",*(uint *)data);
         	}
-#else
-        	PROCESS_YIELD_UNTIL(ev==PROCESS_EVENT_POLL);
-
-#endif
-
-#ifdef DEBUG_CC1310
-			printf(input_buffer);
-#else
-
-#endif
-
+        	else if(ev==CUSTOMER_EVENT_GET_IP_FROM_ID){
+        		uip_ipaddr_t *ip = servreg_hack_lookup(*(servreg_hack_id_t *)data);
+        		if(ip == NULL)
+        			printf("Service with ID %i is not provided in the network\n", *(uint *)data);
+        		else{
+					printf("Service with ID %i is provided by IP ", *(uint *)data);
+					uip_debug_ipaddr_print(ip);
+					printf("\n");
+        		}
+        	}
+        	else if(ev==CUSTOMER_EVENT_GET_LOCAL_ID){
+        		if(serviceID == 0)
+        			printf("No service registered yet.\n");
+        		else
+        			printf("Service registered with ID %i\n", serviceID);
+        	}
+        	else if(ev==CUSTOMER_EVENT_GET_LOCAL_IP){
+        		uip_ipaddr_t *ip;
+        		uip_gethostaddr(ip);
+        		printf("The IPv6 address of this device is ");
+        		uip_debug_ipaddr_print(ip);
+        		printf("\n");
+        	}
         }
         PROCESS_END();
 }

@@ -1,31 +1,21 @@
 #include "contiki.h"
 #include "contiki-net.h"
-#include "net/ip/uip-debug.h"
 #include "servreg-hack.h"
 #include "simple-udp.h"
+#include "net/ip/uip-debug.h"
 #include "dev/button-sensor.h"
 #include "net/rpl/rpl.h"
-
-#ifdef CC26XX_UART_CONF_ENABLE
-#include "dev/cc26xx-uart.h"
-#include "dev/serial-line.h"
-#endif
+#include "uart-module.h"
+#include "init_process.h"
 
 /* Normally the software runs to be used on a CC1310. However if it's supposed to be debugged, on of the following
  * defines can be used.
  */
 
-//#define DEBUG_CC1310	// CC1310 will not send UDP packets, but UART messages
-#define DEBUG_Z1	// Node will not react to UART messages, but send "Hello World" via UDP when Button is pressed
-
+//#define RELEASE
+#define DEBUG
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
-
-/* ID for Servrag-Hack. Must be the same as on sender side */
-#define SERVICE_ID_ROOT 190
-
-/* Handler for Simple-UDP Connection */
-static struct simple_udp_connection udp_connection;
 
 PROCESS(init_system_proc, "Init system process");
 AUTOSTART_PROCESSES(&init_system_proc);
@@ -40,40 +30,16 @@ void cb_receive_udp(struct simple_udp_connection *c,
                     uint16_t receiver_port,
                     const uint8_t *data,
                     uint16_t datalen) {
-#ifdef DEBUG_COOJA
-		printf("Received data via UDP: %s \n", data);
-		printf("From Port: %i \n", sender_port);
-		if(sender_addr == NULL)
-			printf("No sender address");
-		else{
-			printf("From address: ");
-			uip_debug_ipaddr_print(sender_addr);
-		}
-		simple_udp_sendto_port(c,								// Handler to identify connection
-						data, 									// Buffer of bytes to be sent
-						datalen,								// Length of buffer
-						sender_addr,							// Destination IP-Address
-						sender_port);
-#elif DEBUG_CC1310
-		printf("Received data via UDP: %s \n", data);
-#else
-		printf("%s", data);
+#ifdef DEBUG
+	printf("Received data %s from ip ", data);
+	uip_debug_ipaddr_print(sender_addr);
+	printf(" on port %i\n", receiver_port);
+#elif RELEASE
+	uip_debug_ipaddr_print(sender_addr);
+	printf(" %i %s", sender_port, data);
 #endif
 }
-/**********************************************************
- * Set global IPv6 Address
- **********************************************************/
-static uip_ipaddr_t *
-set_global_address(void)
-{
-  static uip_ipaddr_t ipaddr;
 
-  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
-  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
-  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
-
-  return &ipaddr;
-}
 /**********************************************************
  * Create RPL dag
  **********************************************************/
@@ -91,60 +57,97 @@ create_rpl_dag(uip_ipaddr_t *ipaddr)
     dag = rpl_get_any_dag();
     uip_ip6addr(&prefix, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
     rpl_set_prefix(dag, &prefix, 64);
+#ifdef DEBUG
     PRINTF("created a new RPL dag\n");
   } else {
     PRINTF("failed to create a new RPL DAG\n");
   }
+#endif
 }
 
+/**********************************************************
+ * Set global IPv6 Address
+ **********************************************************/
+static uip_ipaddr_t *
+set_global_address(void)
+{
+  static uip_ipaddr_t ipaddr;
+
+  uip_ip6addr(&ipaddr, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
+  uip_ds6_set_addr_iid(&ipaddr, &uip_lladdr);
+  uip_ds6_addr_add(&ipaddr, 0, ADDR_AUTOCONF);
+
+  return &ipaddr;
+}
 /**********************************************************
  * Main process
  **********************************************************/
 PROCESS_THREAD(init_system_proc, ev, data){
         PROCESS_BEGIN();
 
+        /* Handler for Simple-UDP Connection */
+        static struct simple_udp_connection udp_connection;
+
         /* IP Address of device */
-        static uip_ipaddr_t *ip_addr;
+		static uip_ipaddr_t *ip_addr;
 
-        /* ID for Servrag-Hack. Must be the same as on sender side */
-        static servreg_hack_id_t serviceID = SERVICE_ID_ROOT;
-
-#ifdef CC26XX_UART_H_
-		cc26xx_uart_init();
-		cc26xx_uart_set_input(uart_handler);
-#ifdef DEBUG_CC1310
-		printf("CC130: Hello World");
-#endif
-#endif
-
-		/* Set IP-Address and create a RPL DAG */
 		ip_addr = set_global_address();
 		create_rpl_dag(ip_addr);
 
-#ifdef DEBUG_COOJA
-		printf(" IP: ");
-        uip_debug_ipaddr_print(ip_addr);
-#elif DEBUG_CC1310
-        printf(" IP: ");
-        uip_debug_ipaddr_print(ip_addr);
-#endif
-        /* Provide a Servreg-Hack service to share the IP Address */
-        servreg_hack_init();
-		servreg_hack_register(serviceID, ip_addr);
+		uart_init();
+		process_start(&uart_int_handler, NULL);
 
-        // Register with Simple-UDP
-        simple_udp_register(&udp_connection,					// Handler to identify this connection
+        /* IP Address of destination */
+        uip_ipaddr_t *ip_dest_p;
+
+		servreg_hack_init();
+
+        simple_udp_register(&udp_connection,						// Handler to identify this connection
                             UDP_PORT_OUT,							// Port for outgoing packages
                             NULL,									// Destination-IP-Address for outgoing packages
                             UDP_PORT_CENTRAL,						// Port for incoming packages
                             cb_receive_udp);						// Int handler for incoming packages
-#ifdef DEBUG_COOJA
-        printf("\n Initialized. \n");
-#elif DEBUF_CC1310
-        printf("\n Initialized. \n");
-#endif
+
         while (1) {
-			PROCESS_YIELD();
+        	PROCESS_YIELD();
+        	if(ev==CUSTOMER_EVENT_SEND_TO_ID){
+        		udp_packet packet;
+        		packet = *(udp_packet *)data;
+#ifdef DEBUG
+			printf("Trying to reach ID: %i\n", packet.dest_id);
+#endif
+    			ip_dest_p = servreg_hack_lookup(packet.dest_id);				// Get receiver IP via Servreg-Hack
+    			if(ip_dest_p==NULL)
+#ifdef DEBUG
+    				printf("Server not found \n");
+#endif
+    			else
+#ifdef DEBUG
+    				printf("Server address ");
+    				uip_debug_ipaddr_print(ip_dest_p);
+    				printf("\n");
+    				printf("Data: %s\n", packet.data);
+#endif
+    				simple_udp_sendto(&udp_connection,					// Handler to identify connection
+    								packet.data, 						// Data to be sent
+    								strlen(packet.data), 				// Length of data
+    								ip_dest_p);							// Destination IP-Address*/
+        	}
+        	else if(ev==CUSTOMER_EVENT_REGISTER_ID){
+        		printf("Register service with id %i\n", *(servreg_hack_id_t *)data);
+        		servreg_hack_register(*(servreg_hack_id_t *)data, ip_addr);
+        	}
+        	else if(ev==CUSTOMER_EVENT_GET_IP_FROM_ID){
+        		uip_ipaddr_t *ip = servreg_hack_lookup(*(servreg_hack_id_t *)data);
+        		if(ip == NULL)
+        			printf("Service with ID %i is not provided in the network\n", *(uint *)data);
+        		else{
+					printf("Service with ID %i is provided by IP ", *(uint *)data);
+					uip_debug_ipaddr_print(ip);
+					printf("\n");
+        		}
+        	}
         }
         PROCESS_END();
 }
+
