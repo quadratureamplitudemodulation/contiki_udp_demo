@@ -41,6 +41,7 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 		PROCESS_YIELD_UNTIL(ev==serial_line_event_message);
 		static char *ptr;
 		static short unsigned int id;
+static udp_packet packet;
 
 		ptr=TOKENIZE_START((char *)data);
 
@@ -70,7 +71,6 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 					if(convertid(ptr, &id)){
 						ptr=TOKENIZE_RESUME;
 						printf("Sending to ID %i the data %s\n", id, ptr);
-						udp_packet packet;
 						packet.dest_id=id;
 						packet.data=ptr;
 						process_post(&init_system_proc, CUSTOMER_EVENT_SEND_TO_ID, &packet);
