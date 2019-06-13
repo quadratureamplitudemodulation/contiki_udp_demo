@@ -12,8 +12,12 @@
  * defines can be used.
  */
 
-#define DEBUG
-//#define RELEASE
+#define DEBUG 1
+#define RELEASE 0
+#define NODE
+#ifdef ROOT
+#undef ROOT
+#endif
 
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
@@ -31,9 +35,16 @@ void cb_receive_udp(struct simple_udp_connection *c,
                     uint16_t receiver_port,
                     const uint8_t *data,
                     uint16_t datalen) {
-	printf("Received data %s from IP \n", data);
+	if(datalen == 2){
+		if((char)data[0]==(char)PING){
+			change_root_id(*(data+1));
+			return;
+		}
+	}
+
+	printf("Received data '%s' from IP ", data);
 	uip_debug_ipaddr_print(sender_addr);
-	printf("\non port %i\n", receiver_port);
+	printf(" on port %i\n", receiver_port);
 }
 /**********************************************************
  * Set global IPv6 Address
@@ -84,11 +95,15 @@ PROCESS_THREAD(init_system_proc, ev, data){
 
         while (1) {
         	PROCESS_YIELD();
-        	if(ev==CUSTOMER_EVENT_SEND_TO_ID){
+        	if(ev==CUSTOMER_EVENT_SEND_TO_ID || ev==CUSTOMER_EVENT_SEND_TO_IP){
         		udp_packet packet;
         		packet = *(udp_packet *)data;
-        		printf("Trying to reach ID: %i\n", packet.dest_id);
-    			ip_dest_p = servreg_hack_lookup(packet.dest_id);				// Get receiver IP via Servreg-Hack
+        		if(ev==CUSTOMER_EVENT_SEND_TO_ID){
+        			printf("Trying to reach ID: %i\n", packet.dest_id);
+        			ip_dest_p = servreg_hack_lookup(packet.dest_id);				// Get receiver IP via Servreg-Hack
+        		}
+        		else
+        			ip_dest_p = &packet.dest_addr;
     			if(ip_dest_p==NULL)
     				printf("Server not found \n");
     			else
@@ -127,11 +142,24 @@ PROCESS_THREAD(init_system_proc, ev, data){
         			printf("Service registered with ID %i\n", serviceID);
         	}
         	else if(ev==CUSTOMER_EVENT_GET_LOCAL_IP){
-        		uip_ipaddr_t *ip;
-        		uip_gethostaddr(ip);
         		printf("The IPv6 address of this device is ");
-        		uip_debug_ipaddr_print(ip);
-        		printf("\n");
+        		uip_debug_ipaddr_print(ip_addr);
+				printf("\n");
+        	}
+        	else if(ev==CUSTOMER_EVENT_CHECK_ROOT){
+        		udp_packet *packet = data;
+        		char * sendingData = PING;
+        		packet->data=(char *)PING;
+        		printf("Checking if edge router is reachable at ID %u\n", packet->dest_id);
+        		ip_dest_p = servreg_hack_lookup((servreg_hack_id_t)packet->dest_id);
+        		if(ip_dest_p==NULL)
+        			printf("Service with ID %i is not provided in the network\n", packet->dest_id);
+        		else{
+					simple_udp_sendto(&udp_connection,					// Handler to identify connection
+										sendingData, 						// Data to be sent
+										strlen(sendingData), 				// Length of data
+										ip_dest_p);							// Destination IP-Address*/
+        		}
         	}
         }
         PROCESS_END();

@@ -1,3 +1,4 @@
+#include <string.h>
 #include "contiki.h"
 #include "contiki-net.h"
 #include "servreg-hack.h"
@@ -12,13 +13,20 @@
  * defines can be used.
  */
 
-//#define RELEASE
-#define DEBUG
+#define RELEASE 0
+#define DEBUG 1
+#define ROOT
+#ifdef NODE
+#undef NODE
+#endif
+
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
 
 PROCESS(init_system_proc, "Init system process");
 AUTOSTART_PROCESSES(&init_system_proc);
+
+static short unsigned int serviceID=0;
 
 /**********************************************************
  * Int Handler for received UDP packages
@@ -30,14 +38,32 @@ void cb_receive_udp(struct simple_udp_connection *c,
                     uint16_t receiver_port,
                     const uint8_t *data,
                     uint16_t datalen) {
-#ifdef DEBUG
-	printf("Received data %s from ip ", data);
+#if DEBUG
+	printf("Received data %s from ip ", (char *)data);
 	uip_debug_ipaddr_print(sender_addr);
 	printf(" on port %i\n", receiver_port);
 #elif RELEASE
 	uip_debug_ipaddr_print(sender_addr);
 	printf(" %i %s", sender_port, data);
 #endif
+
+	static udp_packet packet;
+	uint16_t pinglength = strlen(PING);
+	if(datalen == pinglength){
+		if(serviceID>0){
+			if(!strcmp((char *)data,PING)){
+				printf("Service ID Poll Received\n");
+				char ptr[2];
+				ptr[0] = (char)PING;
+				ptr[1] = (char)serviceID;
+				packet.data=ptr;
+				printf("Sending data %s of size %u\n", ptr, strlen(ptr));
+				packet.dest_addr=*sender_addr;
+				process_post(&init_system_proc, CUSTOMER_EVENT_REACT_TO_POLL, &packet);
+				return;
+			}
+		}
+	}
 }
 
 /**********************************************************
@@ -57,7 +83,7 @@ create_rpl_dag(uip_ipaddr_t *ipaddr)
     dag = rpl_get_any_dag();
     uip_ip6addr(&prefix, UIP_DS6_DEFAULT_PREFIX, 0, 0, 0, 0, 0, 0, 0);
     rpl_set_prefix(dag, &prefix, 64);
-#ifdef DEBUG
+#if DEBUG
     PRINTF("created a new RPL dag\n");
   } else {
     PRINTF("failed to create a new RPL DAG\n");
@@ -113,16 +139,16 @@ PROCESS_THREAD(init_system_proc, ev, data){
         	if(ev==CUSTOMER_EVENT_SEND_TO_ID){
         		udp_packet packet;
         		packet = *(udp_packet *)data;
-#ifdef DEBUG
+#if DEBUG
 			printf("Trying to reach ID: %i\n", packet.dest_id);
 #endif
     			ip_dest_p = servreg_hack_lookup(packet.dest_id);				// Get receiver IP via Servreg-Hack
     			if(ip_dest_p==NULL)
-#ifdef DEBUG
+#if DEBUG
     				printf("Server not found \n");
 #endif
     			else
-#ifdef DEBUG
+#if DEBUG
     				printf("Server address ");
     				uip_debug_ipaddr_print(ip_dest_p);
     				printf("\n");
@@ -136,6 +162,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
         	else if(ev==CUSTOMER_EVENT_REGISTER_ID){
         		printf("Register service with id %i\n", *(servreg_hack_id_t *)data);
         		servreg_hack_register(*(servreg_hack_id_t *)data, ip_addr);
+        		serviceID=*(servreg_hack_id_t *)data;
         	}
         	else if(ev==CUSTOMER_EVENT_GET_IP_FROM_ID){
         		uip_ipaddr_t *ip = servreg_hack_lookup(*(servreg_hack_id_t *)data);
@@ -146,6 +173,14 @@ PROCESS_THREAD(init_system_proc, ev, data){
 					uip_debug_ipaddr_print(ip);
 					printf("\n");
         		}
+        	}
+        	else if(ev==CUSTOMER_EVENT_REACT_TO_POLL){
+        		udp_packet *packet = (udp_packet *)data;
+        		printf("Reacting to poll\n");
+        		simple_udp_sendto(&udp_connection,					// Handler to identify connection
+        							packet->data, 						// Data to be sent
+        		    				strlen(packet->data), 				// Length of data
+        		    				&packet->dest_addr);							// Destination IP-Address*/
         	}
         }
         PROCESS_END();
