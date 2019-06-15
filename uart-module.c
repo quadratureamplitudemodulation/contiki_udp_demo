@@ -19,12 +19,12 @@
 #define TOKENIZE_RESUME strtok(NULL, " ")
 #define TOKENIZE_REST strtok(NULL, "\0")
 
-static uint8_t vsroot_id = 0;
+static uint8_t vsroot_id = 190;
 
 PROCESS(uart_int_handler, "UART Interrupt Handler");
 
 void change_root_id(uint8_t id){
-	printf("Root provides a service with ID %u", id);
+	printf("Edge Routers Service ID is %u\n", id);
 	vsroot_id=id;
 }
 
@@ -32,7 +32,7 @@ static short int convertid(char *string, unsigned short int *target){
 	unsigned int i;
 	if(strlen(string) != 3){
 		printf("ID must be a three digit number.\n");
-		printf("%s\n", string);
+l		printf("%s\n", string);
 		return 0;
 	}
 	for(i=0; i<3; i++)
@@ -186,11 +186,11 @@ static uint strtoipv4(char *ip, uip_ip4addr_t *addr){
 	unsigned short int i;
 	for(i=0; i<4; i++){
 		if(i==0)
-			ptr = strtok(ip,".");
+			ptr = strtok_single(ip,".");
 		else if(i<3)
-			ptr=strtok(NULL,".");
+			ptr = strtok_single(NULL,".");
 		else
-			ptr=strtok(NULL,"\0");
+			ptr = strtok_single(NULL,"\0");
 		if(strlen(ptr)>3 || ptr==NULL)
 			return 0;
 		buf = strtoul(ptr, NULL, 0);
@@ -208,7 +208,7 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 		static char *ptr;
 		static short unsigned int id;
 		static udp_packet packet;
-
+		printf("Input: %s\n", (char*)data);
 		ptr=TOKENIZE_START((char *)data);
 
 		if(COMPARE(ptr, "service")){
@@ -234,7 +234,6 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 				ptr=TOKENIZE_REST;
 				if(convertid(ptr, &id)){
 					packet.dest_id = id;
-					packet.data = (char *)PING;
 					process_post(&init_system_proc, CUSTOMER_EVENT_CHECK_ROOT, &packet);
 				}
 			}
@@ -266,22 +265,29 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 				else if(COMPARE(ptr, "extern")){
 					if(vsroot_id>0){
 						ptr=TOKENIZE_RESUME;
-						uip_ip4addr_t addr;
+						static uip_ip4addr_t addr;
 						if(strtoipv4(ptr, &addr)){
 							ptr=TOKENIZE_RESUME;
 							if(strlen(ptr)<=5){
 								uint32_t buf = strtoul(ptr, NULL, 0);
 								if(buf < 65536){
-									uint16_t port = (unsigned short int) buf;
+									static uint8_t udpPort[2];
+									udpPort[0] = (uint8_t)((uint16_t)buf>>8);
+									udpPort[1] = (uint8_t)(buf&0xFF);
+									//udpPort[0]=192;
+									//udpPort[1]=200;
+									printf("Port[0]: %u\n", udpPort[0]);
+									printf("Port[1]: %u\n", udpPort[1]);
+									//printf("Port[2]: %u\n", port[2]);
 									ptr=TOKENIZE_REST;
 									packet.dest_id=vsroot_id;
-									char *data = (char *)addr.u8;
-									strcat(data, DELIMITER);
-									strcat(data, (char *)port);
-									strcat(data, DELIMITER);
-									strcat(data, ptr);
-									strcat(data, DELIMITER);
-									process_post(&init_system_proc, CUSTOMER_EVENT_SEND_TO_IP, &packet);
+									strcat(ptr, DELIMITER);
+									strcat(ptr, (char *)udpPort);
+									strcat(ptr, DELIMITER);
+									strcat(ptr, (char *)addr.u8);
+									strcat(ptr, DELIMITER);
+									packet.data=ptr;
+									process_post(&init_system_proc, CUSTOMER_EVENT_SEND_TO_ID, &packet);
 
 								}
 								else

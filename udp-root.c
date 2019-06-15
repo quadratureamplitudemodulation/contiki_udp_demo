@@ -15,18 +15,12 @@
 
 #define RELEASE 0
 #define DEBUG 1
-#define ROOT
-#ifdef NODE
-#undef NODE
-#endif
 
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
 
 PROCESS(init_system_proc, "Init system process");
 AUTOSTART_PROCESSES(&init_system_proc);
-
-static short unsigned int serviceID=0;
 
 /**********************************************************
  * Int Handler for received UDP packages
@@ -47,22 +41,58 @@ void cb_receive_udp(struct simple_udp_connection *c,
 	printf(" %i %s", sender_port, data);
 #endif
 
-	static udp_packet packet;
-	uint16_t pinglength = strlen(PING);
-	if(datalen == pinglength){
-		if(serviceID>0){
-			if(!strcmp((char *)data,PING)){
-				printf("Service ID Poll Received\n");
-				char ptr[2];
-				ptr[0] = (char)PING;
-				ptr[1] = (char)serviceID;
-				packet.data=ptr;
-				printf("Sending data %s of size %u\n", ptr, strlen(ptr));
-				packet.dest_addr=*sender_addr;
-				process_post(&init_system_proc, CUSTOMER_EVENT_REACT_TO_POLL, &packet);
-				return;
-			}
+	if(datalen == 1){
+		static udp_packet packet;
+		if(data[0]==PING){
+			printf("Service ID Poll Received\n");
+			packet.dest_addr=*sender_addr;
+			process_post(&init_system_proc, CUSTOMER_EVENT_REACT_TO_POLL, &packet);
+			return;
 		}
+	}
+	else{
+		printf("Received Data: \n");
+		int k;
+		for(k=0; k<datalen; k++)
+			printf("%u\n", data[k]);
+		static route_packet packet;
+		char *ptr;
+		ptr=strtok((char *)data,DELIMITER);
+		packet.data=ptr;
+		ptr=strtok(NULL,DELIMITER);
+		if(strlen(ptr) != 2){
+			printf("Port has wrong length.\n");
+			return;
+		}
+		packet.ext_port=ptr[0]<<8 | ptr[1];
+		ptr=strtok(NULL, DELIMITER);
+		if(strlen(ptr)!=4){
+			printf("Dest IP has wrong length.\n");
+			printf("Length is %i\n", strlen(ptr));
+			int i;
+			for(i=0; i<strlen(ptr); i++)
+				printf("Ptr[%i]: %u\n",i, ptr[i]);
+			return;
+		}
+		packet.ext_addr.u8[0]=ptr[0];
+		packet.ext_addr.u8[1]=ptr[1];
+		packet.ext_addr.u8[2]=ptr[2];
+		packet.ext_addr.u8[3]=ptr[3];
+		packet.int_port=sender_port;
+		packet.int_addr=*sender_addr;
+		printf("%u", packet.ext_port);
+		printf(DELIMITER);
+		printf("%u", packet.int_port);
+		printf(DELIMITER);
+		int i;
+		for(i=0; i<4; i++)
+			printf("%c", packet.ext_addr.u8[i]);
+		printf(DELIMITER);
+		for(i=0; i<16; i++)
+			printf("%c", packet.int_addr.u8[i]);
+		printf(DELIMITER);
+		printf("%s", packet.data);
+		printf("\n");
 	}
 }
 
@@ -111,6 +141,8 @@ set_global_address(void)
 PROCESS_THREAD(init_system_proc, ev, data){
         PROCESS_BEGIN();
 
+
+        static short unsigned int serviceID=0;
         /* Handler for Simple-UDP Connection */
         static struct simple_udp_connection udp_connection;
 
@@ -124,7 +156,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
 		process_start(&uart_int_handler, NULL);
 
         /* IP Address of destination */
-        uip_ipaddr_t *ip_dest_p;
+        static uip_ipaddr_t *ip_dest_p;
 
 		servreg_hack_init();
 
@@ -163,24 +195,20 @@ PROCESS_THREAD(init_system_proc, ev, data){
         		printf("Register service with id %i\n", *(servreg_hack_id_t *)data);
         		servreg_hack_register(*(servreg_hack_id_t *)data, ip_addr);
         		serviceID=*(servreg_hack_id_t *)data;
-        	}
-        	else if(ev==CUSTOMER_EVENT_GET_IP_FROM_ID){
-        		uip_ipaddr_t *ip = servreg_hack_lookup(*(servreg_hack_id_t *)data);
-        		if(ip == NULL)
-        			printf("Service with ID %i is not provided in the network\n", *(uint *)data);
-        		else{
-					printf("Service with ID %i is provided by IP ", *(uint *)data);
-					uip_debug_ipaddr_print(ip);
-					printf("\n");
-        		}
+
         	}
         	else if(ev==CUSTOMER_EVENT_REACT_TO_POLL){
-        		udp_packet *packet = (udp_packet *)data;
-        		printf("Reacting to poll\n");
-        		simple_udp_sendto(&udp_connection,					// Handler to identify connection
-        							packet->data, 						// Data to be sent
-        		    				strlen(packet->data), 				// Length of data
-        		    				&packet->dest_addr);							// Destination IP-Address*/
+				if(serviceID>0){
+        			udp_packet *packet = (udp_packet *)data;
+					uint8_t answer[2];
+					answer[0]=PING;
+					answer[1]=serviceID;
+					printf("Reacting to poll\n");
+					simple_udp_sendto(&udp_connection,						// Handler to identify connection
+										answer, 							// Data to be sent
+										sizeof(answer)/sizeof(answer[0]),	// Length of data
+										&packet->dest_addr);					// Destination IP-Address
+				}
         	}
         }
         PROCESS_END();

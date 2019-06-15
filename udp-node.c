@@ -14,10 +14,8 @@
 
 #define DEBUG 1
 #define RELEASE 0
-#define NODE
-#ifdef ROOT
-#undef ROOT
-#endif
+#define NODE 1
+#define ROOT 0
 
 #define UDP_PORT_CENTRAL 1234
 #define UDP_PORT_OUT 1234
@@ -36,8 +34,9 @@ void cb_receive_udp(struct simple_udp_connection *c,
                     const uint8_t *data,
                     uint16_t datalen) {
 	if(datalen == 2){
-		if((char)data[0]==(char)PING){
-			change_root_id(*(data+1));
+		if(data[0]==PING){
+			printf("Edge router anounced his Service ID as %u\n", data[1]);
+			change_root_id(data[1]);
 			return;
 		}
 	}
@@ -148,17 +147,16 @@ PROCESS_THREAD(init_system_proc, ev, data){
         	}
         	else if(ev==CUSTOMER_EVENT_CHECK_ROOT){
         		udp_packet *packet = data;
-        		char * sendingData = PING;
-        		packet->data=(char *)PING;
+        		uint8_t ping=PING;
         		printf("Checking if edge router is reachable at ID %u\n", packet->dest_id);
         		ip_dest_p = servreg_hack_lookup((servreg_hack_id_t)packet->dest_id);
         		if(ip_dest_p==NULL)
         			printf("Service with ID %i is not provided in the network\n", packet->dest_id);
         		else{
-					simple_udp_sendto(&udp_connection,					// Handler to identify connection
-										sendingData, 						// Data to be sent
-										strlen(sendingData), 				// Length of data
-										ip_dest_p);							// Destination IP-Address*/
+					simple_udp_sendto(&udp_connection,							// Handler to identify connection
+										&ping, 									// Data to be sent
+										sizeof(ping),							// Length of data
+										ip_dest_p);								// Destination IP-Address
         		}
         	}
         }

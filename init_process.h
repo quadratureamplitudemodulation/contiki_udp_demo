@@ -13,13 +13,21 @@
 #define CUSTOMER_EVENT_REACT_TO_POLL	16
 
 #define DELIMITER "."
-#define PING "1"
+#define PING 55
 
 typedef struct{
 	unsigned short int dest_id;
 	uip_ipaddr_t dest_addr;
 	char *data;
 } udp_packet;
+
+typedef struct{
+	uip_ip4addr_t ext_addr;
+	uip_ip6addr_t int_addr;
+	uint16_t ext_port;
+	uint16_t int_port;
+	char* data;
+} route_packet;
 
 PROCESS_NAME(init_system_proc);
 #endif
