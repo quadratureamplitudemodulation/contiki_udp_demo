@@ -357,38 +357,35 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 								if(buf < 65536){
 									static uint8_t udpPort[2];
 									int i,k;
-									char strbuf[4];
-									static uint8_t *data;
+									static uint8_t externPayload[MAX_PAYLOAD_EXTERN+9];
 									udpPort[0] = (uint8_t)((uint16_t)buf>>8);
 									udpPort[1] = (uint8_t)(buf&0xFF);
-									sprintf(strbuf, "%u%u", udpPort[0], udpPort[1]);
-									for(i=0; i<2; i++)
-										strbuf[i]-='0';
 									ptr=TOKENIZE_REST;
-									free(data);
-									uint16_t datalen = sizeof(addr.u8)/sizeof(addr.u8[0])+sizeof(udpPort)/sizeof(udpPort[0])+strlen(ptr)+3;
-									data = (uint8_t *)malloc(datalen);
-									for(i=0; i<sizeof(addr.u8)/sizeof(addr.u8[0]);i++)
-										data[i] = addr.u8[i];
-									data[i] = (uint8_t)DELIMITER[0];
-									i++;
-									k=i;
-									for(i=0; i<sizeof(udpPort)/sizeof(udpPort[0]);i++)
-										data[i+k] = udpPort[i];
-									data[i+k] = (uint8_t)DELIMITER[0];
-									i++;
-									k+=i;
-									for(i=0; i<strlen(ptr); i++)
-										data[i+k]=(uint8_t)ptr[i];
-									data[i+k] = (uint8_t)DELIMITER[0];
-									i++;
-									datalen=i+k;
-									packet.dest_id=root_id;
-									packet.dataIsChar=0;
-									packet.ui8Data=data;
-									packet.datalen=datalen;
-									process_post(&init_system_proc, CUSTOMER_EVENT_SEND_TO_ID, &packet);
-
+									if(strlen(ptr)<=MAX_PAYLOAD_EXTERN){
+										uint16_t datalen = sizeof(addr.u8)/sizeof(addr.u8[0])+sizeof(udpPort)/sizeof(udpPort[0])+strlen(ptr)+3;
+										for(i=0; i<sizeof(addr.u8)/sizeof(addr.u8[0]);i++)
+											externPayload[i] = addr.u8[i];
+										externPayload[i] = (uint8_t)DELIMITER[0];
+										i++;
+										k=i;
+										for(i=0; i<sizeof(udpPort)/sizeof(udpPort[0]);i++)
+											externPayload[i+k] = udpPort[i];
+										externPayload[i+k] = (uint8_t)DELIMITER[0];
+										i++;
+										k+=i;
+										for(i=0; i<strlen(ptr); i++)
+											externPayload[i+k]=(uint8_t)ptr[i];
+										externPayload[i+k] = (uint8_t)DELIMITER[0];
+										i++;
+										datalen=i+k;
+										packet.dest_id=root_id;
+										packet.dataIsChar=0;
+										packet.ui8Data=externPayload;
+										packet.datalen=datalen;
+										process_post(&init_system_proc, CUSTOMER_EVENT_SEND_TO_ID, &packet);
+									}
+									else
+										printf("Payload is too long. Please compile with a highe max payload or provide a a smaller payload.\n");
 								}
 								else
 									printf("Invalid port number");

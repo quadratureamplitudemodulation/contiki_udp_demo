@@ -33,6 +33,10 @@ void cb_receive_udp(struct simple_udp_connection *c,
                     uint16_t receiver_port,
                     const uint8_t *data,
                     uint16_t datalen) {
+	printf("Received a UDP packet with datalength: %u\n", datalen);
+	int i;
+	for(i=0; i<datalen; i++)
+		printf("Data[%i]: %u\n", i, data[i]);
 	if(datalen == 2){
 		if(data[0]==PING){
 			printf("Edge router anounced his Service ID as %u\n", data[1]);

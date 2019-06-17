@@ -141,7 +141,9 @@ PROCESS_THREAD(init_system_proc, ev, data){
                             UDP_PORT_OUT,										// Port for outgoing packages
                             NULL,												// Destination-IP-Address for outgoing packages->Individual for every packet
                             UDP_PORT_LOCAL,										// Port for incoming packages
-                            cb_receive_udp);									// Int handler for incoming packages
+                            cb_receive_udp)										// Int handler for incoming packages
+
+
 
         while (1) {
         	PROCESS_YIELD();
@@ -154,10 +156,13 @@ PROCESS_THREAD(init_system_proc, ev, data){
 					answer[1]=serviceID;
 #if MODE==DEBUG
 					printf("Reacting to ping\n");
+					printf("Destination address:\n");
+					uip_debug_ipaddr_print(&packet->dest_addr);
+					printf("\n");
 #endif
 					simple_udp_sendto(&udp_connection,							// Handler to identify connection
 										answer, 								// Send prepared answer
-										sizeof(answer)/sizeof(answer[0]),		// Length of answer
+										2,										// Length of answer
 										&packet->dest_addr);					// Destination IP-Address
 				}
         	}

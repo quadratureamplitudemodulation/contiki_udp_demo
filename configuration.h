@@ -29,6 +29,7 @@
 
 #define DELIMITER "."										// Delimiter for packets to be routed
 #define PING 55												// Content of PING
+#define MAX_PAYLOAD_EXTERN 20								// Maximum Size of payload sent to an extern client in Bytes
 
 
 #endif
