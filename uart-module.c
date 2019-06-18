@@ -273,8 +273,8 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 	while(1){
 		PROCESS_YIELD_UNTIL(ev==serial_line_event_message);
 		static char *ptr;																			// Used for result of strtok
-		static short unsigned int id;																// Can be used to store an service ID
 #if RPLDEVICE==NODE || MODE==DEBUG
+		static short unsigned int id;																// Can be used to store a service ID
 		static udp_packet packet;																	// Can be used to fill any UDP packet
 		printf("Input: %s\n", (char*)data);															// Print the input
 		ptr=TOKENIZE_START((char *)data);
@@ -358,16 +358,16 @@ PROCESS_THREAD(uart_int_handler, ev, data){
 									static uint8_t udpPort[2];
 									int i,k;
 									char strbuf[4];
-									static uint8_t *data;
+									static uint8_t data[BUFFER_PAYLOAD_UDP_TO_EXT+9];
 									udpPort[0] = (uint8_t)((uint16_t)buf>>8);
 									udpPort[1] = (uint8_t)(buf&0xFF);
-									sprintf(strbuf, "%u%u", udpPort[0], udpPort[1]);
+									//sprintf(strbuf, "%u%u", udpPort[0], udpPort[1]);
 									for(i=0; i<2; i++)
 										strbuf[i]-='0';
 									ptr=TOKENIZE_REST;
-									free(data);
+									//free(data);
 									uint16_t datalen = sizeof(addr.u8)/sizeof(addr.u8[0])+sizeof(udpPort)/sizeof(udpPort[0])+strlen(ptr)+3;
-									data = (uint8_t *)malloc(datalen);
+									//data = (uint8_t *)malloc(datalen);
 									for(i=0; i<sizeof(addr.u8)/sizeof(addr.u8[0]);i++)
 										data[i] = addr.u8[i];
 									data[i] = (uint8_t)DELIMITER[0];

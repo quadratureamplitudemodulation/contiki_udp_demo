@@ -23,12 +23,13 @@
 /*
  * Configure the project at compile time with these defines
  */
-#define MODE 		DEBUG									// Select whether software shall be compiled in DEBUG or RELEASE mode
+#define MODE 		RELEASE									// Select whether software shall be compiled in DEBUG or RELEASE mode
 #define RPLDEVICE	ROOT									// Define the RPL position of the device. Can be either NODE or ROOT
-#define TARGET		Z1										// Define the target. Z1 and CC1310 are supported.
+#define TARGET		CC1310										// Define the target. Z1 and CC1310 are supported.
 
 #define DELIMITER "."										// Delimiter for packets to be routed
 #define PING 55												// Content of PING
+#define BUFFER_PAYLOAD_UDP_TO_EXT 30								// Maximum payload for externally outgoing UDP packets in Bytes
 
 
 #endif
