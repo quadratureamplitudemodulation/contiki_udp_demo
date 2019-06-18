@@ -91,7 +91,10 @@ static void create_rpl_dag(uip_ipaddr_t *ipaddr)
     rpl_set_prefix(dag, &prefix, 64);
 #if MODE==DEBUG
     PRINTF("created a new RPL dag\n");
-  } else {
+#endif  
+} 
+#if MODE==DEBUG
+else {
     PRINTF("failed to create a new RPL DAG\n");
   }
 #endif
@@ -122,7 +125,9 @@ PROCESS_THREAD(init_system_proc, ev, data){
         static short unsigned int serviceID = 0;								// If a service is registered, this will be used to store the ID
         static struct simple_udp_connection udp_connection;						// Handler for Simple-UDP Connection
 		static uip_ipaddr_t *ip_addr;											// IP Address of device
-		static uip_ipaddr_t *ip_dest_p;											// Can be used to store the IP Address of a destination
+#if MODE==DEBUG		
+static uip_ipaddr_t *ip_dest_p;											// Can be used to store the IP Address of a destination
+#endif
         static char *ptr;														// Can be used to store return value of strtoken
 
 		ip_addr = set_global_address();
@@ -281,6 +286,7 @@ PROCESS_THREAD(init_system_proc, ev, data){
 							 * Byte[k+1..]		:	Payload
 							 * Last Byte		: 	SUPERFRAMEDELIMITER = '\n'
 							 */
+#if MODE==DEBUG
 							printf("%u", packet.ext_port);
 							printf(DELIMITER);
 							printf("%u", packet.int_port);
@@ -294,6 +300,21 @@ PROCESS_THREAD(init_system_proc, ev, data){
 							printf(DELIMITER);
 							printf("%s", packet.data);
 							printf("\n");
+#elif MODE==RELEASE												
+							printf("%c%c", (char)((packet.ext_port>>8)&0xFF), (char)(packet.ext_port&0xFF));
+							printf(DELIMITER);
+							printf("%c%c", (char)((packet.int_port>>8)&0xFF), (char)(packet.int_port&0xFF));
+							printf(DELIMITER);
+							int i;
+							for(i=0; i<4; i++)
+								printf("%c", (char)(packet.ext_addr.u8[i]&0xFF));
+							printf(DELIMITER);
+							for(i=0; i<16; i++)
+								printf("%c", (char)(packet.int_addr.u8[i]&0xFF));
+							printf(DELIMITER);
+							printf("%s", packet.data);
+							printf("\n");
+#endif
         				}
 #if MODE==DEBUG
         				else
@@ -303,8 +324,8 @@ PROCESS_THREAD(init_system_proc, ev, data){
 #if MODE==DEBUG
         			else
         				printf("UDP Port doesn't have the right length. Packet not a route packet. Received data: |%s|.\n", (char *)data);
-				}
 #endif
+				}
 #if MODE==DEBUG
 				else
 					printf("Destination IP has the wrong length. Packet not a route packet. Received data: |%s|.\n", (char *)data);
